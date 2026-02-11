@@ -16,7 +16,7 @@ class AuditProcessor:
         self.keywords = ['ajuste', 'estorno', 'erro', 'manual', 'urgente', 'socio', 'conforme']
 
     def process_audit(self, output_path):
-        # Carregamento inteligente (CSV ou Excel)
+        # Carregamento (CSV ou Excel)
         if self.file_path.endswith('.csv'):
             df = pd.read_csv(self.file_path)
         else:
@@ -25,31 +25,55 @@ class AuditProcessor:
 
         # Nota: O pandas as vezes lê a coluna sem nome como 'Unnamed: 2'
         df.columns = [c if 'Unnamed' not in str(c) else 'Historico' for c in df.columns]
-        
+        Colunas_originais = list(df.columns)
+
         df['Data'] = pd.to_datetime(df['Data'], errors='coerce')
         df['Débito'] = pd.to_numeric(df['Débito'], errors='coerce').fillna(0)
         df['Crédito'] = pd.to_numeric(df['Crédito'], errors='coerce').fillna(0)
         df['Valor_Bruto'] = df['Débito'] + df['Crédito']
 
         # --- Procedimentos ---
-        df['Proc_10x_Media'] = df['Valor_Bruto'] > (df.groupby('Cta.C.Part.')['Valor_Bruto'].transform('mean') * 10)
-        df['Proc_Excede_ET'] = df['Valor_Bruto'] > self.et_value
-        df['Proc_Redondo'] = df['Valor_Bruto'].apply(lambda x: x > 0 and x % 100 == 0)
-        df['Proc_Sem_Hist'] = df['Historico'].apply(lambda x: len(str(x)) < 5 or pd.isna(x))
-        df['Proc_FDS'] = df['Data'].dt.dayofweek.isin([5, 6])
-        df['Proc_Keywords'] = df['Historico'].str.contains('|'.join(self.keywords), case=False, na=False)
+        
+        df['10x_Media'] = df['Valor_Bruto'] > (df.groupby('Cta.C.Part.')['Valor_Bruto'].transform('mean') * 10)
+        df['Excede_ET'] = df['Valor_Bruto'] > self.et_value
+        df['Redondo'] = df['Valor_Bruto'].apply(lambda x: x > 0 and x % 100 == 0)
+        df['Sem_Hist'] = df['Historico'].apply(lambda x: len(str(x)) < 5 or pd.isna(x))
+        df['Fds'] = df['Data'].dt.dayofweek.isin([5, 6])
+        df['Palavra_Chave'] = df['Historico'].str.contains('|'.join(self.keywords), case=False, na=False)
+        
+        Procedimentos = {
+            "10xMedia": "10x_Media",
+            "ExcedeET": "Excede_ET",
+            "Redondo": "Redondo",
+            "Sem Historico": "Sem_Hist",
+            "Final De Semana": "Fds",
+            "Palavras Chave": "Palavra_Chave"
+        }
+        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name="Geral", index=False)
+
+            # Abas Específicas:
+            for nome_aba, coluna_filtro in Procedimentos.items():
+                df_aba = df.copy()
+
+                colunas_finais = Colunas_originais + [coluna_filtro]
+                
+                # Garantimos que só pegamos colunas que realmente existem (evita erros)
+                colunas_existentes = [c for c in colunas_finais if c in df_aba.columns]
+                
+                df_aba[colunas_existentes].to_excel(writer, sheet_name=nome_aba, index=False)
 
         output_path = "Razao_Auditado_Final.xlsx"
         df.to_excel(output_path, index=False)
         
         # Gerar estatísticas para o Painel
         stats = {
-            '10x Média': df['Proc_10x_Media'].sum(),
-            'Excede ET': df['Proc_Excede_ET'].sum(),
-            'Vlr Redondo': df['Proc_Redondo'].sum(),
-            'Sem Histórico': df['Proc_Sem_Hist'].sum(),
-            'Fim de Semana': df['Proc_FDS'].sum(),
-            'Palavras-Chave': df['Proc_Keywords'].sum()
+            '10x Média': df['10x_Media'].sum(),
+            'Excede ET': df['Excede_ET'].sum(),
+            'Vlr Redondo': df['Redondo'].sum(),
+            'Sem Histórico': df['Sem_Hist'].sum(),
+            'Fim de Semana': df['Fds'].sum(),
+            'Palavras-Chave': df['Palavra_Chave'].sum()
         }
         
         return output_path, stats
@@ -81,9 +105,6 @@ class DashboardWindow(ctk.CTkToplevel):
         ax.spines['right'].set_visible(False)
 
         plt.tight_layout()
-        canvas = FigureCanvasTkAgg(fig, master=self)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True, padx=20, pady=20)
 
         # Adiciona os números em cima das barras
         for bar in bars:
@@ -93,6 +114,9 @@ class DashboardWindow(ctk.CTkToplevel):
         canvas = FigureCanvasTkAgg(fig, master=self)
         canvas.draw()
         canvas.get_tk_widget().pack(fill="both", expand=True, padx=20, pady=20)
+
+
+        
 
 class App(ctk.CTk):
     def __init__(self):
