@@ -1,9 +1,13 @@
+from csv import writer
+from datetime import datetime   
+from tkinter.font import Font
 import pandas as pd
 import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import os
+from openpyxl.styles import Font, PatternFill, Alignment
 
 # Configurações de Design
 ctk.set_appearance_mode("Dark")
@@ -50,8 +54,8 @@ class AuditProcessor:
             "Palavras Chave": "Palavra_Chave"
         }
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            df.to_excel(writer, sheet_name="Geral", index=False)
-
+            df.to_excel(writer, sheet_name="Geral", index=False, startrow=7)
+            self.aplicar_estilo_profissional(writer, "Geral")
             # Abas Específicas:
             for nome_aba, coluna_filtro in Procedimentos.items():
                 df_aba = df.copy()
@@ -61,7 +65,8 @@ class AuditProcessor:
                 # Garantimos que só pegamos colunas que realmente existem (evita erros)
                 colunas_existentes = [c for c in colunas_finais if c in df_aba.columns]
                 
-                df_aba[colunas_existentes].to_excel(writer, sheet_name=nome_aba, index=False)
+                df_aba[colunas_existentes].to_excel(writer, sheet_name=nome_aba, index=False, startrow=3)
+                self.aplicar_estilo_profissional(writer, nome_aba)
 
         output_path = "Razao_Auditado_Final.xlsx"
         df.to_excel(output_path, index=False)
@@ -75,8 +80,64 @@ class AuditProcessor:
             'Fim de Semana': df['Fds'].sum(),
             'Palavras-Chave': df['Palavra_Chave'].sum()
         }
-        
         return output_path, stats
+    
+    def aplicar_estilo(Self, writer, nome_aba):
+        # --- TEXTO PADRÃO NAS PRIMEIRAS LINHAS ---
+            # Mescla as células da coluna A até a última coluna de dados
+            ws = writer.sheets[nome_aba]
+            ultima_col_letra = ws.cell(row=4, column=ws.max_column).column_letter
+
+            ws.merge_cells(f'A1:{ultima_col_letra}1')
+            ws['A1'] = "Villela e Associados Auditoria e Consultoria Ltda."
+            ws['A1'].font = Font(size=16, bold=True, color="1F4E78")
+
+            ws.merge_cells(f'A2:{ultima_col_letra}2')
+            ws['A2'] = "CLIENTE MODELO"
+            ws['A2'].font = Font(size=13, italic=True)
+
+            meses = {
+            1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril", 
+            5: "maio", 6: "junho", 7: "julho", 8: "agosto", 
+            9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro"
+            }   
+            agora = datetime.now()
+            data_extenso = f"{agora.day} de {meses[agora.month]} de {agora.year}"
+            ws.merge_cells(f'A3:{ultima_col_letra}3')
+            ws['A3'] = f"{data_extenso}"
+            ws['A3'].font = Font(size=11, italic=True)
+            objetivos_proc = {
+            "Geral": "Apresenta a listagem completa de todos os lançamentos processados no período.",
+            "10xMedia": "Identifica outliers (valores muito acima do padrão da conta específica).",
+            "ExcedeET": "Filtra lançamentos acima da Materialidade (Erro Tolerável) definida pelo usuário.",
+            "Redondo": "Identifica lançamentos com valores redondos, que podem indicar estimativas ou falta de precisão.",
+            "Sem Historico": "Detecta lançamentos com descrições ausentes ou excessivamente curtas.",
+            "Final De Semana": "Filtra lançamentos realizados em sábados ou domingos (dias não úteis).",
+            "Palavras Chave": "Busca termos sensíveis no histórico que podem indicar ajustes, erros ou fraudes."
+            }
+
+            ws.merge_cells(f'A4:{ultima_col_letra}4')
+            ws['A4'] = "Objetivo:"
+            texto_objetivo = objetivos_proc.get(nome_aba, "Análise de integridade contábil.")
+            ws.merge_cells(f'A5:{ultima_col_letra}5')
+            ws['A5'] = texto_objetivo
+            ws['A5'].font = Font(size=11, italic=True)
+        # -- cabeçalho e dados ---
+            fonte_padrao = Font(name='Arial', size=10)
+            fonte_cabecalho = Font(name='Arial', size=10, bold=True)
+
+            fill_cabecalho = PatternFill(start_color="A6A6A6", end_color="A6A6A6", fill_type="solid")
+            for cell in ws[7]:
+                cell.fill = fill_cabecalho
+                cell.font = fonte_cabecalho
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                for col in ws.columns:
+                    column_letter = col[0].column_letter
+                    ws.column_dimensions[column_letter].width = 13
+                    
+                    # Aplicar a fonte Arial nos dados (da linha 8 em diante)
+                    for cell in col[7:]: # Começa da linha 8 (índice 7 do Python)
+                        cell.font = fonte_padrao
 
 class DashboardWindow(ctk.CTkToplevel):
     def __init__(self, stats):
@@ -206,7 +267,7 @@ class App(ctk.CTk):
                 initialfile="Razao_Auditado_Final.xlsx",
                 filetypes=[("Excel files", "*.xlsx")]   
             )
- 
+
             if path_saida:
                 try:
                     et = float(self.et_entry.get())
