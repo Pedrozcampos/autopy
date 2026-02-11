@@ -13,8 +13,8 @@ entregando uma arquivo excel(.xlsx) organizado por abas e gera um dashboard visu
 ## 🛠️ Procedimentos de Auditoria
 Abaixo, detalhamos a lógica de cada teste aplicado pelo sistema:
 
-| Procedimento | Descrição Técnica | Nível de Risco |
-| :--- | :--- | :--- |
+| Procedimento | Descrição Técnica 
+| --- | --- |
 | **10x Média** | Identifica lançamentos que excedem 10 vezes a média da conta.
 | **Excede ET** | Filtra valores acima do Erro Tolerável definido pelo usuário.
 | **Valor Redondo** | Captura lançamentos sem centavos (ex: R$ 1.000,00).
