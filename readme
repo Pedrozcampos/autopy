@@ -1,4 +1,4 @@
-# 📊 Auditor Contábil Pro
+# 📊 Auditor Contábil
 > Automação para análise de riscos e procedimentos de auditoria em Python.
 
 ---
@@ -20,7 +20,7 @@ Abaixo, detalhamos a lógica de cada teste aplicado pelo sistema:
 | **Valor Redondo** | Captura lançamentos sem centavos (ex: R$ 1.000,00).
 | **Sem Histórico** | Identifica descrições muito curtas ou inexistentes.
 | **Fim de Semana** | Lançamentos realizados aos sábados ou domingos. 
-| **Palavras-Chave** | Busca termos como "Ajuste", "Erro" ou "Sócio". 
+| **Palavras-Chave** | Busca termos como ('ajuste', 'estorno', 'erro', 'manual', 'urgente', 'socio', 'conforme'). 
 
 ---
 
@@ -29,11 +29,19 @@ Abaixo, detalhamos a lógica de cada teste aplicado pelo sistema:
   <summary><b>Clique para expandir a explicação técnica dos algoritmos</b></summary>
 
   ### Lógica de Processamento
-  O sistema utiliza a biblioteca `pandas` para carregar os dados. O processo de ETL (Extract, Transform, Load) garante que, 
+  - O sistema utiliza a biblioteca `pandas` para carregar os dados. O processo de ETL (Extract, Transform, Load) garante que, 
   mesmo que o arquivo original não tenha cabeçalhos padronizados, a coluna de **Histórico** seja identificada e tratada.
 
   ### Manipulação de Excel
-  Utilizamos o `pd.ExcelWriter` com o motor `openpyxl` para criar um arquivo multi-abas. Cada aba isola um procedimento específico, mantendo os dados originais para que o auditor tenha total rastreabilidade do lançamento analisado.
+  - Utilizamos o `pd.ExcelWriter` com o motor `openpyxl` para criar um arquivo multi-abas. Cada aba isola um procedimento específico, mantendo os dados originais para que o auditor tenha total rastreabilidade do lançamento analisado.
+  
+  ### Observações Técnicas Importantes (Sinceridade):
+  - Valor Bruto: O código soma Débito e Crédito para gerar o Valor_Bruto. Isso significa que ele trata a magnitude da movimentação, independente do sentido contábil.
+
+  - Limpeza de Dados: Antes de processar, o código "limpa" as colunas sem nome (Unnamed) e as chama de "Historico" para garantir que o filtro de palavras-chave não falhe.
+
+  - Separação por Abas: Na exportação para o Excel, o código cria abas individuais para cada filtro, mas mantém o cabeçalho de 8 linhas e a formatação Arial em todas elas para manter o padrão visual da Villela e Associados.
+
 </details>
 
 ---
